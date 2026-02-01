@@ -1,0 +1,28 @@
+name: publish-release-image
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-push:
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (release tag)
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/himalia-core
+          TAG=${{ github.event.release.tag_name }}
+          docker build -t $IMAGE:$TAG -f docker/Dockerfile .
+          docker push $IMAGE:$TAG
+      # Optional: enable after deciding on attestation strategy
+      # - uses: actions/attest-build-provenance@v3
+      # - uses: actions/attest-sbom@v2

@@ -1,0 +1,22 @@
+name: publish-beta-image
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    environment: beta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push (beta tag)
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/himalia-core
+          TAG=beta-$(date +%Y%m%d)-${{ github.sha }}
+          docker build -t $IMAGE:$TAG -f docker/Dockerfile .
+          docker push $IMAGE:$TAG

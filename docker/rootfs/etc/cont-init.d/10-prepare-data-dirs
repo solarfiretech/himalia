@@ -1,0 +1,12 @@
+#!/command/with-contenv sh
+set -eu
+
+mkdir -p /data/db /data/nodered /data/openplc /data/log
+
+# Seed Node-RED starter flow only if none exists
+if [ ! -f /data/nodered/flows.json ] && [ -f /opt/himalia/seed/flows.json ]; then
+  cp /opt/himalia/seed/flows.json /data/nodered/flows.json
+fi
+
+# Ensure scripts are executable
+chmod +x /opt/himalia/openplc/openplc-restore.sh /opt/himalia/openplc/openplc-save.sh || true

@@ -1,0 +1,7 @@
+# Optional: pin exact versions for reproducible builds.
+# Fill this in as you lock dependencies for beta/release.
+#
+# Example:
+# Flask==3.0.3
+# Flask-CORS==4.0.1
+# requests==2.32.3

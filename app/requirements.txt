@@ -1,0 +1,16 @@
+# For reproducible builds: pip install -r requirements.txt -c constraints.txt
+
+Flask
+Flask-CORS
+requests
+SQLAlchemy
+pandas
+numpy
+openpyxl
+APScheduler
+python-dotenv
+PyYAML
+pyvisa-py
+pytest
+pytest-mock
+gunicorn
