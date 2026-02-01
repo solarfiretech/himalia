@@ -1,6 +1,9 @@
 name: publish-dev-image
+
 on:
-  push:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
     branches: [develop]
 
 permissions:
@@ -10,13 +13,21 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
+    # Only publish if CI succeeded and this is a push event
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Build and push (dev tag)
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/himalia-core
-          TAG=dev-${{ github.sha }}
+          TAG=dev-${{ github.event.workflow_run.head_sha }}
           docker build -t $IMAGE:$TAG -f docker/Dockerfile .
           docker push $IMAGE:$TAG
