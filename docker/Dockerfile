@@ -56,6 +56,14 @@ RUN curl -fsSL -o /tmp/s6-noarch.tar.xz \
 
 COPY docker/rootfs/ /
 
+# Ensure s6 scripts are executable (GitHub checkouts may not preserve +x)
+RUN chmod +x \
+    /etc/cont-init.d/* \
+    /etc/cont-finish.d/* \
+    /etc/services.d/*/run \
+ && chmod +x /opt/himalia/openplc/openplc-restore.sh /opt/himalia/openplc/openplc-save.sh || true
+
+
 RUN mkdir -p /etc/crontabs \
  && echo '* * * * * python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1' > /etc/crontabs/root
 
