@@ -1,22 +1,49 @@
 name: publish-beta-image
+
 on:
+  push:
+    branches: [beta]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA to build (default: beta)"
+        required: true
+        default: "beta"
 
 permissions:
   contents: read
   packages: write
+
+concurrency:
+  group: publish-beta-image-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-push:
     environment: beta
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # On push to beta, build exactly what landed on beta
+      - name: Checkout (push)
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/checkout@v4
+
+      # On manual dispatch, build the requested ref
+      - name: Checkout (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Build and push (beta tag)
+
+      - name: Build and push (beta tags)
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/himalia-core
-          TAG=beta-$(date +%Y%m%d)-${{ github.sha }}
-          docker build -t $IMAGE:$TAG -f docker/Dockerfile .
-          docker push $IMAGE:$TAG
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date +%Y%m%d)
+
+          docker build -t $IMAGE:beta-$DATE-$SHORT_SHA -t $IMAGE:beta-latest -f docker/Dockerfile .
+          docker push $IMAGE:beta-$DATE-$SHORT_SHA
+          docker push $IMAGE:beta-latest
