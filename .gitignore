@@ -1,3 +1,6 @@
 *.pyc
 
 himalia.egg-info/
+
+# Ignore secrets
+secrets/

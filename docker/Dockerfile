@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     tzdata \
-    supervisor \
     ca-certificates \
     gnupg \
     xz-utils \
@@ -86,8 +85,13 @@ RUN chmod +x \
  && chmod +x /opt/himalia/openplc/openplc-restore.sh /opt/himalia/openplc/openplc-save.sh || true
 
 
-RUN mkdir -p /etc/crontabs \
- && echo '* * * * * python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1' > /etc/crontabs/root
+#RUN mkdir -p /etc/crontabs \
+# && echo '* * * * * python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1' > /etc/crontabs/root
+RUN mkdir -p /data/log \
+ && printf "SHELL=/bin/sh\nPATH=/usr/local/bin:/usr/bin:/bin\n* * * * * root /usr/local/bin/python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1\n" \
+    > /etc/cron.d/himalia-poller \
+ && chmod 0644 /etc/cron.d/himalia-poller
+
 
 EXPOSE 5000 1880 8080
 ENTRYPOINT ["/init"]
