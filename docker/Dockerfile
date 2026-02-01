@@ -10,7 +10,7 @@ ARG NODE_RED_VERSION=3.1.15
 ARG FLOWFUSE_DASHBOARD_VERSION=1.14.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl \
+    ca-certificates curl xz-utils \
     sqlite3 \
     busybox \
   && rm -rf /var/lib/apt/lists/*
@@ -27,7 +27,18 @@ RUN npm install -g --unsafe-perm node-red@${NODE_RED_VERSION} \
 
 WORKDIR /opt/himalia/app
 COPY app/requirements.txt /opt/himalia/app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Upgrade packaging tooling (helps with resolver + TLS + wheels)
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Harden pip network behavior for CI reliability
+# - longer timeout
+# - more retries
+# - disable version check noise
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120
+
+RUN pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt
 
 COPY app/ /opt/himalia/app/
 COPY nodered/seed/flows.json /opt/himalia/seed/flows.json
