@@ -5,15 +5,37 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # Pin these for beta/release
 ARG S6_OVERLAY_VERSION=3.2.0.2
-ARG NODE_MAJOR=20
-ARG NODE_RED_VERSION=3.1.15
-ARG FLOWFUSE_DASHBOARD_VERSION=1.14.0
+ARG NODE_MAJOR=22
+ARG NODE_RED_VERSION=4.1.4
+ARG FLOWFUSE_DASHBOARD_VERSION=1.30.1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl \
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    build-essential \
+    python3 \
+    python3-pip \
+    python3-dev \
     sqlite3 \
-    busybox \
-  && rm -rf /var/lib/apt/lists/*
+    libsqlite3-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    tzdata \
+    supervisor \
+    ca-certificates \
+    gnupg \
+    xz-utils \
+    procps \
+    cron \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 
 # Node.js (pinned major)
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
@@ -27,7 +49,18 @@ RUN npm install -g --unsafe-perm node-red@${NODE_RED_VERSION} \
 
 WORKDIR /opt/himalia/app
 COPY app/requirements.txt /opt/himalia/app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Upgrade packaging tooling (helps with resolver + TLS + wheels)
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Harden pip network behavior for CI reliability
+# - longer timeout
+# - more retries
+# - disable version check noise
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120
+
+RUN pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt
 
 COPY app/ /opt/himalia/app/
 COPY nodered/seed/flows.json /opt/himalia/seed/flows.json
@@ -44,6 +77,14 @@ RUN curl -fsSL -o /tmp/s6-noarch.tar.xz \
  && rm -f /tmp/s6-noarch.tar.xz /tmp/s6-arch.tar.xz
 
 COPY docker/rootfs/ /
+
+# Ensure s6 scripts are executable (GitHub checkouts may not preserve +x)
+RUN chmod +x \
+    /etc/cont-init.d/* \
+    /etc/cont-finish.d/* \
+    /etc/services.d/*/run \
+ && chmod +x /opt/himalia/openplc/openplc-restore.sh /opt/himalia/openplc/openplc-save.sh || true
+
 
 RUN mkdir -p /etc/crontabs \
  && echo '* * * * * python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1' > /etc/crontabs/root
