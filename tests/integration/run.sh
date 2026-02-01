@@ -50,16 +50,16 @@ sys.exit(1)
 PY
 
 echo "[3/6] Persistence markers (DB/Node-RED/OpenPLC dirs)"
-docker docker compose exec -T core sh -lc 'echo hello > /data/db/_marker_db.txt'
-docker docker compose exec -T core sh -lc 'echo hello > /data/nodered/_marker_nodered.txt'
-docker docker compose exec -T core sh -lc 'echo hello > /data/openplc/_marker_openplc.txt'
+docker compose exec -T core sh -lc 'echo hello > /data/db/_marker_db.txt'
+docker compose exec -T core sh -lc 'echo hello > /data/nodered/_marker_nodered.txt'
+docker compose exec -T core sh -lc 'echo hello > /data/openplc/_marker_openplc.txt'
 
 echo "[4/6] Restart and verify markers persist"
 docker compose restart core
 sleep 5
-docker docker compose exec -T core sh -lc 'test -f /data/db/_marker_db.txt'
-docker docker compose exec -T core sh -lc 'test -f /data/nodered/_marker_nodered.txt'
-docker docker compose exec -T core sh -lc 'test -f /data/openplc/_marker_openplc.txt'
+docker compose exec -T core sh -lc 'test -f /data/db/_marker_db.txt'
+docker compose exec -T core sh -lc 'test -f /data/nodered/_marker_nodered.txt'
+docker compose exec -T core sh -lc 'test -f /data/openplc/_marker_openplc.txt'
 
 echo "[5/6] Shutdown hook markers in logs (OpenPLC save)"
 docker compose stop core
