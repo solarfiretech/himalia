@@ -92,6 +92,11 @@ RUN mkdir -p /data/log \
     > /etc/cron.d/himalia-poller \
  && chmod 0644 /etc/cron.d/himalia-poller
 
+# Install OpenPLC (optional - can be enabled if needed)
+RUN git clone https://github.com/Autonomy-Logic/openplc-runtime.git /opt/himalia/openplc/openplc-runtime && \
+	cd /opt/himalia/openplc/openplc-runtime && \
+    git checkout development && \
+    ./install.sh
 
-EXPOSE 5000 1880 8080
+EXPOSE 5000 1880 8080 8443
 ENTRYPOINT ["/init"]
