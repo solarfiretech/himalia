@@ -1,3 +1,29 @@
 #!/command/with-contenv sh
 set -eu
-exec sh -c 'echo "OPENPLC_RUNTIME_PLACEHOLDER: implement start command" && sleep infinity'
+
+OPENPLC_DIR="${OPENPLC_DIR:-/opt/himalia/openplc/openplc-runtime}"
+OPENPLC_START_SCRIPT="${OPENPLC_START_SCRIPT:-start_openplc.sh}"
+OPENPLC_ENABLED="${OPENPLC_ENABLED:-true}"
+
+if [ "$OPENPLC_ENABLED" = "false" ] || [ "$OPENPLC_ENABLED" = "0" ]; then
+  echo "[openplc] OPENPLC_ENABLED=$OPENPLC_ENABLED; OpenPLC will not start."
+  exec sleep infinity
+fi
+
+if [ ! -d "$OPENPLC_DIR" ]; then
+  echo "[openplc] ERROR: OpenPLC directory not found: $OPENPLC_DIR" >&2
+  exit 111
+fi
+
+cd "$OPENPLC_DIR"
+
+if [ ! -f "$OPENPLC_START_SCRIPT" ]; then
+  echo "[openplc] ERROR: startup script not found: $OPENPLC_DIR/$OPENPLC_START_SCRIPT" >&2
+  exit 111
+fi
+
+# Ensure executable; harmless if already +x
+chmod +x "./$OPENPLC_START_SCRIPT" 2>/dev/null || true
+
+echo "[openplc] Starting OpenPLC via $OPENPLC_DIR/$OPENPLC_START_SCRIPT"
+exec "./$OPENPLC_START_SCRIPT"
