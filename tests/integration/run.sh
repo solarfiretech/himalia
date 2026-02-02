@@ -142,9 +142,9 @@ code, raw = request("GET", "/ping", headers={"Authorization": f"Bearer {token}"}
 if code != 200:
     raise SystemExit(f"ping failed: HTTP {code} body={raw[:400]}")
 data = must_json(raw)
-if data.get("status") != "pong":
+if data.get("status") != "PING:OK":
     raise SystemExit(f"ping: unexpected response: {data}")
-print("ping: OK (pong)")
+print("ping: {data}")
 PY
 
 echo "[5/8] Persistence markers (DB/Node-RED/OpenPLC dirs)"

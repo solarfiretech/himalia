@@ -98,5 +98,5 @@ RUN git clone https://github.com/Autonomy-Logic/openplc-runtime.git /opt/himalia
     git checkout development && \
     ./install.sh
 
-EXPOSE 5000 1880 8080 8443
+EXPOSE 5000 1880 8080 8443 4840
 ENTRYPOINT ["/init"]
