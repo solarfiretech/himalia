@@ -11,7 +11,7 @@ services:
       - "${HIMALIA_OPENPLC_PORT_OP:-8443}:8443"
       - "${HIMALIA_OPENPLC_PORT_OPCUA:-4840}:4840"
     environment:
-      - HIMALIA_API_KEY=${HIMALIA_API_KEY:-}
+      - HIMALIA_API_KEY=${HIMALIA_API_KEY:-change-me}
       - HIMALIA_SCHEDULER_ENABLED=${HIMALIA_SCHEDULER_ENABLED:-true}
       - HIMALIA_CRON_BASE=${HIMALIA_CRON_BASE:-* * * * *}
     volumes:
