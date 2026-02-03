@@ -1,4 +1,12 @@
 #!/command/with-contenv sh
 set -eu
 cd /opt/himalia/app
-exec gunicorn --bind 0.0.0.0:5000 wsgi:app
+
+SERVER="${HIMALIA_API_SERVER:-flask}"
+
+if [ "$SERVER" = "gunicorn" ]; then
+  exec gunicorn --bind 0.0.0.0:5000 wsgi:app
+fi
+
+# Default: Flask dev server (no reload)
+exec flask --app wsgi:app run --host 0.0.0.0 --port 5000 --no-reload --no-debugger

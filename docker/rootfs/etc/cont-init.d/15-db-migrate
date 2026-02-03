@@ -1,0 +1,12 @@
+#!/command/with-contenv sh
+set -eu
+
+# Run DB migrations (safe to run repeatedly)
+cd /opt/himalia/app
+
+if command -v alembic >/dev/null 2>&1; then
+  echo "[cont-init] Running alembic migrations"
+  alembic -c /opt/himalia/app/alembic.ini upgrade head
+else
+  echo "[cont-init] WARN: alembic not installed; skipping migrations" >&2
+fi

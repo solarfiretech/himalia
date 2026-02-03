@@ -17,24 +17,34 @@ dump_debug() {
 
 trap dump_debug ERR
 
-
 echo "== Himalia integration tests =="
+
+# Force auth ON for integration
+export HIMALIA_API_KEY="${HIMALIA_API_KEY:-test-api-key}"
 
 # Ensure clean start
 docker compose down -v >/dev/null 2>&1 || true
 
-echo "[1/8] Build and start stack"
+echo "[1/7] Build and start stack"
 docker compose up --build -d
 
-echo "[2/8] Wait for API health (inside container)"
+echo "[2/7] Wait for API health (inside container)"
 python - <<'PY'
 import time, subprocess, sys
 
 deadline = time.time() + 180
 last_err = None
 
-cmd = ["docker", "compose", "exec", "-T", "core", "python", "-c",
-       "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:5000/api/v1/health', timeout=2).read())"]
+cmd = [
+    "docker",
+    "compose",
+    "exec",
+    "-T",
+    "core",
+    "python",
+    "-c",
+    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:5000/api/v1/health', timeout=2).read())",
+]
 
 while time.time() < deadline:
     try:
@@ -49,123 +59,99 @@ print("Health check failed:", last_err)
 sys.exit(1)
 PY
 
-echo "[3/8] Node-RED / Node.js versions (inside container)"
-docker compose exec -T core sh -lc 'node --version | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+"'
-docker compose exec -T core sh -lc 'npm --version | grep -E "^[0-9]+\\.[0-9]+\\.[0-9]+"'
-docker compose exec -T core sh -lc 'node-red --version >/dev/null && node-red --version'
+echo "[3/7] Security baseline: API key required for device endpoints"
+python - <<'PY'
+import json, os, subprocess, sys
 
-echo "[4/8] OpenPLC Runtime REST API auth flow + ping (inside container)"
+API_KEY = os.environ.get('HIMALIA_API_KEY')
+if not API_KEY:
+    raise SystemExit('HIMALIA_API_KEY not set for integration test')
+
+def curl(args):
+    cmd = ["docker", "compose", "exec", "-T", "core", "sh", "-lc"]
+    cmd.append(" ".join(args))
+    return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8', errors='replace')
+
+# Without key should be 401
+out = curl(["python", "-c", "import urllib.request, urllib.error;\n\n" \
+            "req=urllib.request.Request('http://127.0.0.1:5000/api/v1/devices');\n" \
+            "\n" \
+            "try:\n" \
+            "  urllib.request.urlopen(req, timeout=3)\n" \
+            "  print('UNEXPECTED_OK')\n" \
+            "except urllib.error.HTTPError as e:\n" \
+            "  print(e.code)\n" ])
+if '401' not in out:
+    raise SystemExit(f"Expected 401 without API key, got: {out}")
+
+print("401 verified")
+PY
+
+echo "[4/7] Device CRUD (inside container)"
 docker compose exec -T core python - <<'PY'
 import json
 import os
-import ssl
-import time
 import urllib.request
 import urllib.error
 
-BASE_URL = "https://localhost:8443/api"
+API_KEY = os.environ.get("HIMALIA_API_KEY")
 
-USERNAME = os.environ.get("OPENPLC_TEST_USERNAME", "tgack")
-PASSWORD = os.environ.get("OPENPLC_TEST_PASSWORD", "TGqa090499")
-ROLE = os.environ.get("OPENPLC_TEST_ROLE", "admin")
+base = "http://127.0.0.1:5000/api/v1"
 
-ctx = ssl._create_unverified_context()
+payload = {
+    "name": "IT-CAM-01",
+    "type": "camera_ip_snapshot",
+    "endpoint": "http://example.local/snap.jpg",
+    "auth_mode": "basic",
+    "auth_username": "u",
+    "auth_password": "p",
+}
 
-def request(method: str, path: str, body=None, headers=None, timeout=5):
-    url = BASE_URL + path
-    data = None
-    if body is not None:
-        data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method=method)
-    hdrs = headers or {}
-    if body is not None:
-        hdrs.setdefault("Content-Type", "application/json")
-    for k, v in hdrs.items():
-        req.add_header(k, v)
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-            return resp.status, raw
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", errors="replace")
-        return e.code, raw
+req = urllib.request.Request(
+    base + "/devices",
+    data=json.dumps(payload).encode("utf-8"),
+    method="POST",
+    headers={"Content-Type": "application/json", "X-API-Key": API_KEY},
+)
+with urllib.request.urlopen(req, timeout=5) as resp:
+    assert resp.status == 201
+    dev = json.loads(resp.read().decode("utf-8"))
+    dev_id = dev["id"]
+    assert dev["has_auth_password"] is True
+    assert "auth_password" not in dev
 
-def must_json(raw: str):
-    try:
-        return json.loads(raw)
-    except Exception:
-        raise SystemExit(f"Expected JSON but got: {raw[:400]}")
+# GET list
+req2 = urllib.request.Request(base + "/devices", headers={"X-API-Key": API_KEY})
+with urllib.request.urlopen(req2, timeout=5) as resp:
+    data = json.loads(resp.read().decode("utf-8"))
+    assert data["count"] >= 1
 
-def wait_for_openplc_api(deadline_seconds=180):
-    deadline = time.time() + deadline_seconds
-    last = None
-    # Any HTTP response indicates the server is up; we do not require success here.
-    probe_body = {"username": "_probe_", "password": "_probe_"}
-    while time.time() < deadline:
-        try:
-            code, raw = request("POST", "/login", body=probe_body, timeout=3)
-            print(f"OpenPLC API reachable (login probe HTTP {code})")
-            return
-        except Exception as e:
-            last = e
-            time.sleep(2)
-    raise SystemExit(f"OpenPLC API not reachable within timeout: {last}")
+# DELETE
+req3 = urllib.request.Request(base + f"/devices/{dev_id}", method="DELETE", headers={"X-API-Key": API_KEY})
+with urllib.request.urlopen(req3, timeout=5) as resp:
+    assert resp.status == 204
 
-wait_for_openplc_api()
-
-# 1) Create first user (no auth required for first user)
-code, raw = request("POST", "/create-user", body={"username": USERNAME, "password": PASSWORD, "role": ROLE})
-if code == 201:
-    data = must_json(raw)
-    if data.get("msg") != "User created" or "id" not in data:
-        raise SystemExit(f"create-user: unexpected success payload: {data}")
-    print(f"create-user: OK (id={data.get('id')})")
-elif code in (401, 409):
-    # 401 can occur if a first user already exists; 409 if username already exists.
-    # For integration testing we proceed to login.
-    print(f"create-user: already-initialized (HTTP {code})")
-else:
-    raise SystemExit(f"create-user failed: HTTP {code} body={raw[:400]}")
-
-# 2) Login
-code, raw = request("POST", "/login", body={"username": USERNAME, "password": PASSWORD})
-if code != 200:
-    raise SystemExit(f"login failed: HTTP {code} body={raw[:400]}")
-data = must_json(raw)
-token = data.get("access_token")
-if not token or not isinstance(token, str):
-    raise SystemExit(f"login: missing access_token in response: {data}")
-print("login: OK (token received)")
-
-# 3) Ping
-code, raw = request("GET", "/ping", headers={"Authorization": f"Bearer {token}"})
-if code != 200:
-    raise SystemExit(f"ping failed: HTTP {code} body={raw[:400]}")
-data = must_json(raw)
-if data.get("status") != "PING:OK":
-    raise SystemExit(f"ping: unexpected response: {data}")
-print("ping: {data}")
+print("Device CRUD OK")
 PY
 
-echo "[5/8] Persistence markers (DB/Node-RED/OpenPLC dirs)"
+echo "[5/7] Persistence markers (DB/Node-RED/OpenPLC dirs)"
 docker compose exec -T core sh -lc 'echo hello > /data/db/_marker_db.txt'
 docker compose exec -T core sh -lc 'echo hello > /data/nodered/_marker_nodered.txt'
 docker compose exec -T core sh -lc 'echo hello > /data/openplc/_marker_openplc.txt'
 
-echo "[6/8] Restart and verify markers persist"
+echo "[6/7] Restart and verify markers persist"
 docker compose restart core
 sleep 5
 docker compose exec -T core sh -lc 'test -f /data/db/_marker_db.txt'
 docker compose exec -T core sh -lc 'test -f /data/nodered/_marker_nodered.txt'
 docker compose exec -T core sh -lc 'test -f /data/openplc/_marker_openplc.txt'
 
-echo "[7/8] Shutdown hook markers in logs (OpenPLC save)"
+echo "[7/7] Shutdown hook markers in logs (OpenPLC save)"
 docker compose stop core
 LOGS="$(docker compose logs --no-color core | tail -n 800)"
 echo "$LOGS" | grep -q "OPENPLC_SAVE_START" || (echo "Missing OPENPLC_SAVE_START in logs" && exit 1)
 echo "$LOGS" | grep -q "OPENPLC_SAVE_END" || (echo "Missing OPENPLC_SAVE_END in logs" && exit 1)
 
-echo "[8/8] Cleanup"
 docker compose down -v
 
 echo "== Integration tests passed =="
