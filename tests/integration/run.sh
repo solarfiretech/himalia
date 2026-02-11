@@ -62,6 +62,7 @@ PY
 echo "[3/7] Security baseline: API key required for device endpoints"
 python - <<'PY'
 import json, os, subprocess, sys
+import shlex
 
 API_KEY = os.environ.get('HIMALIA_API_KEY')
 if not API_KEY:
@@ -69,7 +70,7 @@ if not API_KEY:
 
 def curl(args):
     cmd = ["docker", "compose", "exec", "-T", "core", "sh", "-lc"]
-    cmd.append(" ".join(args))
+    cmd.append(shlex.join(args))
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8', errors='replace')
 
 # Without key should be 401
