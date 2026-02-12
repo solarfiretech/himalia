@@ -1,0 +1,18 @@
+#!/command/with-contenv sh
+set -eu
+
+OPENPLC_DIR="${OPENPLC_DIR:-/opt/himalia/openplc/openplc-runtime}"
+OPENPLC_START_SCRIPT="${OPENPLC_START_SCRIPT:-start_openplc.sh}"
+
+if [ ! -d "$OPENPLC_DIR" ]; then
+  echo "[cont-init] OpenPLC directory missing: $OPENPLC_DIR (OpenPLC service will fail)"
+  exit 0
+fi
+
+if [ ! -f "$OPENPLC_DIR/$OPENPLC_START_SCRIPT" ]; then
+  echo "[cont-init] OpenPLC startup script missing: $OPENPLC_DIR/$OPENPLC_START_SCRIPT (OpenPLC service will fail)"
+  exit 0
+fi
+
+chmod +x "$OPENPLC_DIR/$OPENPLC_START_SCRIPT" 2>/dev/null || true
+echo "[cont-init] OpenPLC startup script is present and executable."

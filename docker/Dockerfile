@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     tzdata \
-    supervisor \
     ca-certificates \
     gnupg \
     xz-utils \
@@ -78,6 +77,7 @@ RUN curl -fsSL -o /tmp/s6-noarch.tar.xz \
 
 COPY docker/rootfs/ /
 
+
 # Ensure s6 scripts are executable (GitHub checkouts may not preserve +x)
 RUN chmod +x \
     /etc/cont-init.d/* \
@@ -85,9 +85,22 @@ RUN chmod +x \
     /etc/services.d/*/run \
  && chmod +x /opt/himalia/openplc/openplc-restore.sh /opt/himalia/openplc/openplc-save.sh || true
 
+# Safety: strip CRLF from s6 scripts (Windows checkouts may introduce \r)
+RUN find /etc/cont-init.d /etc/cont-finish.d /etc/services.d -type f -print0 \
+  | xargs -0 sed -i 's/\r$//' || true
+  
+#RUN mkdir -p /etc/crontabs \
+# && echo '* * * * * python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1' > /etc/crontabs/root
+RUN mkdir -p /data/log \
+ && printf "SHELL=/bin/sh\nPATH=/usr/local/bin:/usr/bin:/bin\n* * * * * root /usr/local/bin/python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1\n" \
+    > /etc/cron.d/himalia-poller \
+ && chmod 0644 /etc/cron.d/himalia-poller
 
-RUN mkdir -p /etc/crontabs \
- && echo '* * * * * python /opt/himalia/app/poller.py >> /data/log/poller.log 2>&1' > /etc/crontabs/root
+# Install OpenPLC (optional - can be enabled if needed)
+RUN git clone https://github.com/Autonomy-Logic/openplc-runtime.git /opt/himalia/openplc/openplc-runtime && \
+	cd /opt/himalia/openplc/openplc-runtime && \
+    git checkout development && \
+    ./install.sh
 
-EXPOSE 5000 1880 8080
+EXPOSE 5000 1880 8080 8443 4840
 ENTRYPOINT ["/init"]

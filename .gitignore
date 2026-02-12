@@ -1,3 +1,15 @@
 *.pyc
+*.zip
 
 himalia.egg-info/
+
+# Ignore secrets
+secrets/
+
+# Ignore beta test log files
+docker-info.txt
+docker-version.txt
+himalia-beta-inspect.json
+himalia-beta-logs.txt
+
+.venv/

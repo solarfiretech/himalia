@@ -7,13 +7,17 @@ services:
     ports:
       - "${HIMALIA_API_PORT:-5000}:5000"
       - "${HIMALIA_NODERED_PORT:-1880}:1880"
-      - "${HIMALIA_OPENPLC_PORT:-8080}:8080"
+      - "${HIMALIA_OPENPLC_PORT_WS:-8080}:8080"
+      - "${HIMALIA_OPENPLC_PORT_OP:-8443}:8443"
+      - "${HIMALIA_OPENPLC_PORT_OPCUA:-4840}:4840"
     environment:
-      - HIMALIA_API_KEY=${HIMALIA_API_KEY:-}
+      - HIMALIA_API_KEY=${HIMALIA_API_KEY:-change-me}
       - HIMALIA_SCHEDULER_ENABLED=${HIMALIA_SCHEDULER_ENABLED:-true}
       - HIMALIA_CRON_BASE=${HIMALIA_CRON_BASE:-* * * * *}
     volumes:
       - himalia_data:/data
+    # Allow shutdown hooks (OpenPLC snapshot) to complete reliably.
+    stop_grace_period: 60s
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/v1/health').read()"]
       interval: 30s
