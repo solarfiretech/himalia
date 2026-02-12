@@ -1,3 +1,9 @@
 #!/command/with-contenv sh
 set -eu
-/opt/himalia/openplc/openplc-save.sh || true
+
+if /opt/himalia/openplc/openplc-save.sh; then
+  echo "[cont-finish] OpenPLC save: OK"
+else
+  rc=$?
+  echo "[cont-finish] OpenPLC save: FAILED (rc=${rc})" >&2
+fi
