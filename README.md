@@ -52,3 +52,9 @@ Workflows live in `.github/workflows/`:
 
 ## Governance
 See `docs/github-governance.md` for branch protection and environment approval setup.
+
+
+## API Authentication
+
+All /api/v1 endpoints (except /health and /openapi.json) require `X-API-Key` when `HIMALIA_API_KEY` is set.
+

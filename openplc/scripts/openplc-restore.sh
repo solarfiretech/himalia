@@ -17,6 +17,9 @@ WEBAPI_RUN_DIR="/run/runtime"
 OPENPLC_ARCHIVE="${PERSIST_ROOT}/openplc-runtime-state.tgz"
 WEBAPI_ARCHIVE="${PERSIST_ROOT}/openplc-webapi-runtime.tgz"
 
+# Clean up any interrupted/partial archives from prior shutdowns.
+rm -f "${OPENPLC_ARCHIVE}.tmp" "${WEBAPI_ARCHIVE}.tmp" 2>/dev/null || true
+
 if [ ! -d "${PERSIST_ROOT}" ]; then
   echo "[openplc-restore] Persistent storage root missing: ${PERSIST_ROOT} (skipping restore)"
   echo "OPENPLC_RESTORE_END"

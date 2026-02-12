@@ -3,6 +3,11 @@ set -eu
 
 echo "OPENPLC_SAVE_START"
 
+# Default to fast compression to ensure shutdown snapshots complete within Docker's stop timeout.
+# Override with OPENPLC_GZIP_OPTS (e.g. "-6" or "-9") if desired.
+GZIP_OPTS="${OPENPLC_GZIP_OPTS:--1}"
+export GZIP="${GZIP_OPTS}"
+
 # Persistent storage root (Docker volume mounted at /data)
 # Requirement: only save if this directory already exists.
 PERSIST_ROOT="/data/openplc"
@@ -68,12 +73,22 @@ if [ -d "${OPENPLC_DIR}" ]; then
   else
     echo "[openplc-save] Writing snapshot archive: ${OPENPLC_ARCHIVE}"
 
+    start_ts="$(date +%s)"
+
     # Create archive from the runtime directory root.
     # --numeric-owner avoids name->id mapping surprises.
     tar -czf "${TMP_ARCHIVE}" --numeric-owner -C "${OPENPLC_DIR}" -T "${TMP_LIST}"
 
+    end_ts="$(date +%s)"
+    elapsed="$((end_ts - start_ts))"
+    size_bytes="$(stat -c '%s' "${TMP_ARCHIVE}" 2>/dev/null || echo 0)"
+    echo "[openplc-save] Snapshot archive created (tmp): ${TMP_ARCHIVE} (${size_bytes} bytes) in ${elapsed}s"
+
     # Atomic replace
     mv -f "${TMP_ARCHIVE}" "${OPENPLC_ARCHIVE}"
+
+    # Best-effort fsync for the volume
+    sync 2>/dev/null || true
 
     # Optional: keep a human-readable manifest alongside the archive
     {
@@ -95,8 +110,14 @@ if [ -d "${WEBAPI_RUN_DIR}" ]; then
   TMP_ARCHIVE2="${WEBAPI_ARCHIVE}.tmp"
   echo "[openplc-save] Saving web API runtime state ${WEBAPI_RUN_DIR} -> ${WEBAPI_ARCHIVE}"
 
+  start_ts2="$(date +%s)"
+
   # Archive includes the directory name 'runtime' and all contents (including hidden files).
   tar -czf "${TMP_ARCHIVE2}" --numeric-owner -C "/run" "runtime"
+
+  end_ts2="$(date +%s)"
+  elapsed2="$((end_ts2 - start_ts2))"
+  echo "[openplc-save] Web API runtime snapshot build complete in ${elapsed2}s (tmp=$(ls -lah "${TMP_ARCHIVE2}" 2>/dev/null | awk '{print $5}' || echo '?'))"
   mv -f "${TMP_ARCHIVE2}" "${WEBAPI_ARCHIVE}"
 
   {

@@ -14,3 +14,4 @@ pyvisa-py
 pytest
 pytest-mock
 gunicorn
+alembic

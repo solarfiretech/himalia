@@ -3,3 +3,5 @@ services:
     image: ghcr.io/solarfiretech/himalia-core:beta-latest
     # ensure compose does NOT try to build locally
     build: null
+    # Allow shutdown hooks (OpenPLC snapshot) to complete reliably.
+    stop_grace_period: 60s
